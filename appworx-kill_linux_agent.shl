@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Sort the appwrx processes parents first, hide those with a tty (and a few others)
+apwx_remaining() { ps fU "${USER}" -o ppid,pid,tty,args --no-headers | sort -n | \
+    sed -nr '/\spts\/|\ssh$|vmstat\s[0-9]+$/b; s/\s*[0-9]+\s+([0-9]+)\s(.*)/\1/p';
+}
+
+# Update the apwx_proc_count variable. This is supposedly faster than a subshell 
+apwx_update_count() { apwx_proc_count="$(apwx_remaining | wc -l)"; }
+
+# Next process in line to get whacked
+apwx_next() { apwx_remaining | head -n1; }
+
+apwx_update_count
+while [ "${apwx_proc_count}" -gt 0 ]; do
+    apwx_curr_pid="$(apwx_next)"
+    apwx_counter="0.5"
+    # While the process is still running...
+    while [ $(kill -s 0 "${apwx_curr_pid}"; echo $?) -eq 0 ]; do
+        # Ok, been running for a while. Let's nuke it
+        if [ "${apwx_counter}" -ge 16 ]; then 
+            kill -s 9 "${apwx_curr_pid}"
+        else
+            kill "${apwx_curr_pid}" 
+        fi
+        sleep "${apwx_counter}" 
+        # wait two times longer next time
+        apwx_counter=$(echo "${apwx_counter} * 2" | bc -l)
+    done
+    apwx_update_count
+done

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# The following variables should be assigned a user and password in your
+# ~/.bash_profile and must have rights to start/stop jobs.
+#APWRX_USER=
+#APWRX_PASS=
+
+ABORTED_PIDS=$(appworx JQ | grep ABORTED | sed -nr 's/^\s+([0-9]+\.[0-9]+)\s.*$/\1/p')
+
+LOOP_PROCS() {
+    for proc in $ABORTED_PIDS; do
+        echo -e "#!/bin/bash\n" > "${proc}.shl"
+        echo -e "appworx ${APWRX_CMD} ${proc} 2> /dev/null <<EOF" >> "${proc}.shl"
+        echo -e "$APWRX_USER" >> "${proc}.shl"
+        echo -e "$APWRX_PASS" >> "${proc}.shl"
+        echo -e "y" >> "${proc}.shl"
+        echo -e "exit" >> "${proc}.shl"
+        echo -e "EOF" >> "${proc}.shl"
+        chmod u+x "${proc}.shl"
+        bash -x "${proc}.shl"
+        rm "${proc}.shl"        
+    done;
+}
+
+APWRX_CMD=Hold
+LOOP_PROCS
+
+APWRX_CMD=Release
+LOOP_PROCS
